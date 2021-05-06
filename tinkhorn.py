@@ -4,16 +4,21 @@ import numpy as np
 import scipy as sp
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
+import IPython.display
+from time import time
 
 
 def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True, 
-             eps=1e-12, tol=1e-10, patience=10, verbose=True, plot=True):
+             eps=1e-12, tol=1e-10, patience=10, verbose=True, plot_err=True, plot_mat=True):
     '''
     X, Y - datapoint of two distributions
     beta - regularization parameter 
+    
+    return: K, a, b
     '''
     n, m = len(X), len(Y)
     C = cdist(X, Y)
+#     C /= C.max()
     
     p = np.ones(n) / n
     q = np.ones(m) / m
@@ -21,46 +26,65 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
     K = np.exp(-C / beta)
     Kt = K.T
     b = np.ones(m)
+    
     i = 0
-    err = [10]
     j = 0
+    err = [10]
+    t = []
     for i in range(max_iter):
-        Kb = K.dot(b)
-        a = np.divide(p, Kb)
-        Kta = Kt.dot(a)
-        b = np.divide(q, Kta)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            s = time()
+            Kb = K.dot(b)
+            a = np.divide(p, Kb)
+            Kta = Kt.dot(a)
+            b = np.divide(q, Kta)
+            t.append(time() - s)
         if store_err:
-#             g = np.diag(a) @ K @ np.diag(b)
-#             err.append(np.linalg.norm(g.sum(0) - q) + np.linalg.norm(g.sum(1) - p))
             g0 = a * K.dot(b)
             g1 = b * Kt.dot(a)
             err.append(np.linalg.norm(g0 - p) + np.linalg.norm(g1 - q))
+            ###########################################################
+            if verbose == 2:
+                print(f'{i:5.0f}: {err[-1]:.20f}')
+            if plot_err == 2:
+                    IPython.display.clear_output(wait=True)
+                    plt.figure(figsize=(10,4))
+                    plt.title(f'error rate, {np.mean(t)*1000:3.3f}ms per iteration')
+                    plt.semilogy(range(len(err)-1), err[1:])
+                    plt.show()
+            
             if early_stopping:
                 # if good enough
                 if err[-1] < eps:
                     if verbose:
-                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]}')
+                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
                     break
                 # if no improvements
                 if np.abs(err[-2] - err[-1]) < tol:
                     j += 1
                     if j > patience:
                         if verbose:
-                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]}')
+                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
                         break
                 else:
                     j = 0
-    if plot:
+    else:
+        if verbose:
+            print(f'#iterations={i+1},  err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
+    print('Finished')
+
+    if store_err and plot_err == 1:
         plt.figure(figsize=(10,4))
-        if store_err:
-            plt.subplot(121)
-            plt.title('error')
-            plt.semilogy(range(len(err)-1), err[1:])
-            plt.subplot(122)
+        plt.subplot(121)
+        plt.title('error')
+        plt.semilogy(range(len(err)-1), err[1:])
+        if plot_mat: plt.subplot(122)
+    elif plot_mat:
+        plt.figure(figsize=(5,4))
+    if plot_mat:
         plt.title('optimal transport matrix')
         plt.imshow(a.reshape(-1,1) * K * b.reshape(1,-1))
-        plt.show()
-    
+    if plot_mat or plot_err: plt.show()
     return K, a, b
 
 centers = lambda edges: (edges[:,:-1] + edges[:,1:]) / 2
@@ -75,9 +99,9 @@ def binning(X, Y, bin_size):
     
     clouds = np.vstack([X, Y])
     
-    grid = np.linspace(np.min(clouds, 0), np.max(clouds, 0), bin_size + 1).T # [D, B] n+m +b
+    grid = np.linspace(np.min(clouds, 0), np.max(clouds, 0), bin_size + 1).T # [Dimension, Bins]
     
-    mesh = np.meshgrid(*centers(grid), indexing='xy') 
+    mesh = np.meshgrid(*centers(grid), indexing='xy')
     bins = np.hstack([x.reshape(-1,1) for x in mesh])
     
     p, _ = np.histogramdd(X, bins=grid)
@@ -127,7 +151,7 @@ class Toeplitz(object):
             blocks = np.concatenate([blocks, np.zeros(zeros_size), blocks[tuple(slice_)]], i)
         return blocks
         
-    def matvec(self, x):
+    def matvec(self, x, debug=True):
         ''' fast "matvec" multiplication '''
         if x.ndim > 1:
             if (x.shape[0] == 1 or x.shape[1] == 1):
@@ -135,133 +159,197 @@ class Toeplitz(object):
             else:
                 raise ValueError()
         x_fft = mkl_fft.fftn(np.pad(x.reshape(self.size), self.pad))
-        
-        return np.abs(mkl_fft.ifftn(self.circ_fft * x_fft)[self.area]).ravel()
+        if debug:
+            print('*'*100)
+            print('circ_fft\n', self.circ_fft)
+            print('x_fft\n', x_fft)
+            print('multiplication\n', self.circ_fft * x_fft)
+            print('ifft\n', mkl_fft.ifftn(self.circ_fft * x_fft))
+            print('result\n', np.abs(mkl_fft.ifftn(np.multiply(self.circ_fft, x_fft))[self.area]).ravel())
+            print('*'*100)
+        return np.abs(mkl_fft.ifftn(np.multiply(self.circ_fft, x_fft))[self.area]).ravel()
     
     def full(self):
-        ''' return full matrix np.exp(-C / beta)'''
+        ''' return full matrix np.exp(-C / beta) without recomputation'''
         raise NotImplementedError()
 
 
-def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
-                      eps=1e-12, tol=1e-10, patience=10, verbose=True, plot=True):
+def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
+                      early_stopping=True, eps=1e-12, tol=1e-10, patience=10, 
+                      verbose=True, store_full=True, store_err=True, plot=True, debug=False, debug_=False):
     '''
-    X, Y - datapoints of two distributions
-    bin_size - number of bins (equal for each dimension)
-    beta - regularization parameter 
+    Arguments
+    
+    X, Y:
+        ndarray:
+            if bin_size is int: datapoints of two distributions
+            if bin_size is ndarray: mass distibutions over bins for two distributions
+    bin_size:
+        int: number of bins (equal for each dimension) foo binning,
+        ndarray: array of size [N, D] with coordinates of bin centers
+    beta:
+        float: entropy regularization parameter 
+    early_stopping:
+        bool: whether to stop iterations if the error $E(\gamma)$ value 
+              matches the conditions (eps, tol, patience):
+            $E(\gamma) = ||\gamma @ 1 - p||_2 + ||\gamma^T @ 1 - q||_2
+    eps:
+        float: stops iterations if $E(\gamma)$ < eps
+    tol:
+        float: stops iterations if $E(\gamma)_i - $E(\gamma)_{i-1}$ < tol
+    patience:
+        int: 
+    verbose:
+        0, 1, 2 (or bool): controls the verbosity:
+            0 (False): nothing to be printed
+            1 (True): print stopping criteria or/and final error
+            2: print every iteration error
+    store_full:
+        bool: whether to calculate and return full matrix K = exp(-C/beta)
+    store_err:
+        bool: whether to calculate $E(\gamma)$ (if False, then early_stopping is ignored)
+    plot:
+        0, 1, 2 (or bool): whether to plot error linegraph (if store_err is True)
+            0 (False): nothing to be plotted
+            1 (True): one plot after finished iteration process
+            2: real-time plot during iteration process
+    
+    Return
+    K: 
+        Toeplitz or ndarray
+    a, b, bins, p, q:
+        ndarrays
+    
     '''
-    bins, p, q = binning(X, Y, bin_size)
+    if isinstance(bin_size, int):
+        bins, p, q = binning(X, Y, bin_size)
+    elif isinstance(bin_size, np.ndarray):
+        bins, p, q = bin_size.copy(), X.copy(), Y.copy()
+        p /= p.sum()
+        q /= q.sum()
+    else:
+        raise ValueError()
+    
     size = p.shape
-    p = p.ravel()
-    q = q.ravel()
-    top = cdist(bins[0].reshape(1, -1), bins)
+    p = p.ravel() + 1e-15
+    q = q.ravel() + 1e-15
+    top = cdist(bins[0].reshape(1, -1), bins) # O(B)
+#     top /= top.max()
     K = Toeplitz(np.exp(- top / beta), size)
+    if debug_:
+        C = cdist(bins, bins)
+        K_ = np.exp(-C / beta)
     b = np.ones(np.prod(size))
     
     i = 0
     j = 0
     err = [10]
+    t = []
+    print('Starting iterative process')
+    
     for i in range(max_iter):
-        with np.errstate(divide='ignore', invalid='ignore'):
-            Kb = K.matvec(b)
-            a = np.nan_to_num(np.divide(p, Kb))
-#             a = np.divide(p, Kb)
-            Ka = K.matvec(a)
-            b = np.nan_to_num(np.divide(q, Ka))
-#             b = np.divide(q, Ka)
+        
+        with np.errstate(divide='raise', over='raise', under='raise'):
+            try:
+                if debug or debug_:
+                    print(f'ITERATION {i}')
+                    print('-'*100)
+                s = time()
+                if debug: print('MATVEC by b\n b =\n', b)
+                Kb = K.matvec(b, debug) # O(B log B)
+                if debug_:
+                    K_b = K_ @ b
+                    print('.'*100)
+                    print("\nISCLOSE TO REAL MATVEC:", np.all(np.isclose(K_b, Kb, 1e-10)), 
+                          '\n\tabs(diff).mean', np.abs(K_b - Kb).mean(),
+                          '\n\tabs(diff).mean / abs(K_b).mean', np.abs(K_b - Kb).mean() / np.abs(K_b).mean())
+                    print('.'*100)
+                
+                if debug: print(f'DIVIDING p by K.b\n p =\n{p}\n K.b =\n', Kb)
+                a = np.divide(p, Kb)
+                if debug: print('MATVEC by a\n a =\n', a)
+                Ka = K.matvec(a, debug) # O(B log B)
+                          
+                if debug_:
+                    K_a = K_ @ a
+                    print('.'*100)
+                    print("\nISCLOSE TO REAL MATVEC:", np.all(np.isclose(K_a, Ka, 1e-10)), 
+                          '\n\tabs(diff).mean', np.abs(K_a - Ka).mean(),
+                          '\n\tabs(diff).mean / abs(K_a).mean', np.abs(K_a - Ka).mean() / np.abs(K_a).mean())
+                    print('.'*100)
+                          
+                if debug: print(f'DIVIDING q by K.a\n q =\n{q}\n K.a =\n', Ka) 
+                b = np.divide(q, Ka)
+                if debug: print('-'*100)
+                t.append(time() - s)
+            except FloatingPointError as e:
+                if verbose:
+                    print(e)
+                    print(f'#iterations={i+1},  err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
+                break
+        
+
         if store_err:
-#             g = np.diag(a) @ K_full @ np.diag(b)
-            g0 = a * (K.matvec(b))
-            g1 = b * (K.matvec(a))
-#             err.append(np.linalg.norm(g.sum(0) - q) + np.linalg.norm(g.sum(1) - p))
-            err.append(np.linalg.norm(g0 - p) + np.linalg.norm(g1 - q))
-            #########################################################
+            with np.errstate(divide='raise', over='raise', under='raise'):
+                try:
+                    g0 = a * (K.matvec(b, debug))
+                    g1 = b * (K.matvec(a, debug))
+                except:
+                    pass
+                err.append(np.linalg.norm(g0 - p) + np.linalg.norm(g1 - q))
+            ###########################################################
+            if verbose == 2:
+                print(f'{i:5.0f}: {err[-1]:.20f}')
+            if plot == 2:
+                    IPython.display.clear_output(wait=True)
+                    plt.figure(figsize=(10,4))
+                    plt.title(f'error rate, {np.mean(t)*1000:3.3f}ms per iteration')
+                    plt.semilogy(range(len(err)-1), err[1:])
+                    plt.show()
+            
             if early_stopping:
                 # if good enough
                 if err[-1] < eps:
                     if verbose:
-                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]}')
+                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
                     break
                 # if no improvements
                 if np.abs(err[-2] - err[-1]) < tol:
                     j += 1
                     if j > patience:
                         if verbose:
-                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]}')
+                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
                         break
                 else:
                     j = 0
+                # if error goes up
+                if err[-1] > err[-2]:
+                    if verbose:
+                        print(f'#iterations={i+1}, early stopping: error up, err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
+                    break
+                
     else:
         if verbose:
-            print(f'#iterations={i},  err={err[-1]}')
+            print(f'#iterations={i+1},  err={err[-1]}, {np.mean(t)*1000:3.3f}ms per iteration')
+    print('Finished')
+    if store_full:
+        K_full = np.exp(-cdist(bins, bins) / beta)
     if plot:
-        plt.figure(figsize=(10,4))
-        if store_err:
-            plt.subplot(121)
+        if plot == 1 or store_full:
+            plt.figure(figsize=(10,4))
+        if store_err and plot == 1:
+            plt.subplot(1,2,1)
             plt.title('error')
             plt.semilogy(range(len(err)-1), err[1:])
-            plt.subplot(122)
-        plt.title('optimal transport matrix')
-        K_full = np.exp(-cdist(bins, bins) / beta)
-        plt.imshow(a.reshape(-1,1) * K_full * b.reshape(1,-1))
+        if store_full:
+            if plot: plt.subplot(1,2,3-plot)
+            plt.title('optimal transport matrix')
+            K_full = np.exp(-cdist(bins, bins) / beta)
+            plt.imshow(a.reshape(-1,1) * K_full * b.reshape(1,-1))
         plt.show()
-    
-    return K_full, a, b, bins, p, q
+    if store_full:
+        return K_full, a, b, bins, p, q
+    else:
+        return K, a, b, bins, p, q
 
-
-# def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200, stop=True, eps=1e-12, tol=1e-10, patience=10, verbose=True, plot=True):
-#     '''
-#     X, Y - datapoint of two distributions
-#     bin_size - number of bins (equal for each dimension)
-#     beta - regularization parameter 
-#     '''
-#     bins, p, q = binning(X, Y, bin_size)
-#     size = p.shape
-#     p = p.ravel()
-#     q = q.ravel()
-#     top = cdist(bins[0].reshape(1,-1), bins)
-#     K = Toeplitz(np.exp(- top / beta), size)
-#     b = np.ones(np.prod(size))
-    
-#     i = 0
-#     if stop:
-#         j = 0
-#         err = [10]
-#     while i < max_iter:
-#         Kb = K.matvec(b)
-#         a = np.divide(p, Kb)
-#         Ka = K.matvec(a)
-#         b = np.divide(q, Ka)
-        
-#         if stop:
-#             g0 = b * (K.matvec(a))
-#             g1 = a * (K.matvec(b))
-
-#             err.append(np.linalg.norm(g0 - q) + np.linalg.norm(g1 - p))
-#             #########################################################
-#             # if good enough
-#             if err[-1] < eps:
-#                 if verbose:
-#                     print(f'#iterations={i+1}, early stopping: eps, err={err[-1]}')
-#                 break
-#             # if no improvements
-#             if np.abs(err[-2] - err[-1]) < tol:
-#                 j += 1
-#                 if j > patience:
-#                     if verbose:
-#                         print(f'#iterations={i+1}, early stopping: tol, err={err[-1]}')
-#                     break
-#             else:
-#                 j = 0
-#         i +=1
-#     if plot:
-#         plt.figure(figsize=(10,4))
-#         plt.subplot(121)
-#         plt.title('error')
-#         plt.semilogy(range(len(err)-1), err[1:])
-# #         plt.subplot(122)
-# #         plt.title('optimal transport matrix')
-# #         plt.imshow()
-#         plt.show()
-    
-#     return K, a, b
+mapping = lambda g, C: np.argmin(g.dot(C), 1)
