@@ -313,6 +313,7 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
                     plt.figure(figsize=(10,4))
                     plt.title(f'error rate, {np.mean(t)*1000:3.3f}ms per iteration')
                     plt.semilogy(range(len(err)-1), err[1:])
+                    plt.savefig('error.png')
                     plt.show()
             
             if early_stopping:
@@ -354,6 +355,7 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
             plt.title('optimal transport matrix')
             K_full = np.exp(-cdist(bins, bins) / beta)
             plt.imshow(a.reshape(-1,1) * K_full * b.reshape(1,-1))
+        plt.savefig('error.png')
         plt.show()
     if store_full:
         return K_full, a, b, bins, p, q

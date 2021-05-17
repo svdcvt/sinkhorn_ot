@@ -3,25 +3,35 @@ from time import time
 import argparse
 import numpy as np
 
-argparser = argparse.ArgumentParser()
-argparser.add_argument('binsize', type=int)
-argparser.add_argument('shape', choices=['sphere', 'circle', 'flower'])
-argparser.add_argument('method', default='toeplitz', choices=['sinkhorn', 'toeplitz'])
-argparser.add_argument('--inverse', action='count', required=False)
-argparser.add_argument('--path', default='.', type=str, required=False)
+argparser = argparse.ArgumentParser(description=
+                                    '''The program finds mapping gamma@Y with defined by arguments parameters. 
+                                    Please, run the script from the directory with the following precomputed files:
+                                    1) bins_{shape}_{binsize}.npy
+                                    2) p_{shape}_{binsize}.npy
+                                    3) q_{shape}_{binsize}.npy
+                                    4) K_{method}.npy
+                                    5) a_{method}.npy
+                                    6) b_{method}.npy.
+                                    
+                                    These files can be precomputed with mesh_task.py (1-3) and sinkhorn.py (4-6).''')
+argparser.add_argument('binsize', type=int, help='number of bins in each dimension')
+argparser.add_argument('shape', choices=['ball', 'disk', 'flower'], help='task to solve')
+argparser.add_argument('method', default='toeplitz', choices=['sinkhorn', 'toeplitz'], help='method to use (default toeplitz)')
+argparser.add_argument('--inverse', action='count', required=False, help='whether to find mapping from trget to source with the same plan')
+argparser.add_argument('--path', default='.', type=str, required=False, help='path to save obtained mapping (default ".")')
 args = argparser.parse_args()
 
 # ------------------------------------
 
 binsize, shape, method, inverse, path = args.binsize, args.shape, args.method, args.inverse, args.path
 
-bins = np.load(os.path.join(path, f'bins_{shape}_{binsize}.npy'), allow_pickle=True)
-p    = np.load(os.path.join(path, f'p_{shape}_{binsize}.npy'), allow_pickle=True)
-q    = np.load(os.path.join(path, f'q_{shape}_{binsize}.npy'), allow_pickle=True)
+bins = np.load(f'bins_{shape}_{binsize}.npy', allow_pickle=True)
+p    = np.load(f'p_{shape}_{binsize}.npy', allow_pickle=True)
+q    = np.load(f'q_{shape}_{binsize}.npy', allow_pickle=True)
 
-K = np.load(os.path.join(path, f'K_{method}.npy'), allow_pickle=True).item(0)
-a = np.load(os.path.join(path, f'a_{method}.npy'), allow_pickle=True)[:, None]
-b = np.load(os.path.join(path, f'b_{method}.npy'), allow_pickle=True)[:, None]
+K = np.load(f'K_{method}.npy', allow_pickle=True).item(0)
+a = np.load(f'a_{method}.npy', allow_pickle=True)[:, None]
+b = np.load(f'b_{method}.npy', allow_pickle=True)[:, None]
 
 start = time()
 if method == 'toeplitz':
