@@ -18,7 +18,7 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
     '''
     n, m = len(X), len(Y)
     C = cdist(X, Y)
-    C /= C.max()
+    # C /= C.max()
     
     p = np.ones(n) / n
     q = np.ones(m) / m
@@ -239,7 +239,7 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
     p = p.ravel() + 1e-15
     q = q.ravel() + 1e-15
     top = cdist(bins[0].reshape(1, -1), bins) # O(B)
-    top /= top.max()
+    # top /= top.max()
     K = Toeplitz(np.exp(- top / beta), size)
     if debug_:
         C = cdist(bins, bins)

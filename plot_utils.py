@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-def plot_image(target, image, save_path, method, shape, binsize, beta, **kwargs):
+def plot_image(target, image, path, method, shape, binsize, beta, limits, **kwargs):
     
     s = kwargs.get('s', 2)
     alpha = kwargs.get('alpha', 0.5)
@@ -16,7 +16,7 @@ def plot_image(target, image, save_path, method, shape, binsize, beta, **kwargs)
     plt.scatter(target[:,0], target[:,1], s=s, alpha=alpha, c='orange', label='tagret')
     plt.scatter(image[:,0], image[:,1], s=s, alpha=alpha, c='green', label='source corresponding image')
     
-    lim_min, lim_max = kwargs.get('limits', (target.min(-2), target.max(-2)))
+    lim_min, lim_max = limits if limits is not None else (target.min(-2), target.max(-2))
     plt.legend(fontsize=14, loc='upper right', bbox_to_anchor=(1., 0.98))
     plt.xlabel('$x_1$', fontsize=14)
     plt.xticks(fontsize=14)
@@ -24,12 +24,12 @@ def plot_image(target, image, save_path, method, shape, binsize, beta, **kwargs)
     plt.ylabel('$x_2$', fontsize=14)
     plt.yticks(fontsize=14)
     plt.ylim(lim_min[1] - 0.05, lim_max[1] + 0.05)
-    
-    plt.savefig(os.path.join(save_path, f'image_{method}_{shape}_{binsize}_{beta}.pdf'))
+    # plt.savefig('current_result.png')
+    plt.savefig(os.path.join(path, f'image_{method}_{shape}_{binsize}_{beta}.pdf'))
     plt.show()
 
 
-def plot_map(source, image, save_path, method, shape, binsize, beta, **kwargs):
+def plot_map(source, image, path, method, shape, binsize, beta, limits, **kwargs):
     
     head_width = kwargs.get('head_width', 0.01)
     alpha = kwargs.get('alpha', 0.3)
@@ -42,8 +42,8 @@ def plot_map(source, image, save_path, method, shape, binsize, beta, **kwargs):
         plt.arrow(xbins[j, 0], xbins[j, 1], hat_xbins[j, 0] - xbins[j, 0], hat_xbins[j, 1] - xbins[j, 1], 
                   head_width=head_width, alpha=alpha, length_includes_head=True)
     
-    lim_min, lim_max = kwargs.get('limits', (np.min(np.vstack([source.min(-2), image.min(-2)]), -2),\
-                                             np.max(np.vstack([source.max(-2), image.max(-2)]), -2)))
+    lim_min, lim_max = limits if limits is not None else (np.min(np.vstack([source.min(-2), image.min(-2)]), -2),\
+                                                          np.max(np.vstack([source.max(-2), image.max(-2)]), -2))
     plt.xlabel('$x_1$', fontsize=14)
     plt.xticks(fontsize=14)
     plt.xlim(lim_min[0] - 0.05, lim_max[0] + 0.05)
@@ -51,10 +51,11 @@ def plot_map(source, image, save_path, method, shape, binsize, beta, **kwargs):
     plt.yticks(fontsize=14)
     plt.ylim(lim_min[1] - 0.05, lim_max[1] + 0.05)
     
-    plt.savefig(os.path.join(path, f'map_{method}_{binsize}_{beta}_square_to_{shape}.pdf'))
+    # plt.savefig(os.path.join(path, 'current_result.png'))
+    plt.savefig(os.path.join(path, f'map_{method}_{shape}_{binsize}_{beta}.pdf'))
     plt.show()
 
-def plot_mesh(points, distribution, save_path, every=1, method, shape, binsize, beta, **kwargs):
+def plot_mesh(points, distribution, path, method, shape, binsize, beta, limits, every=1, **kwargs):
     
     markersize = kwargs.get('markersize', 0)
     linewidth = kwargs.get('linewidth', 0.2)
@@ -68,7 +69,7 @@ def plot_mesh(points, distribution, save_path, every=1, method, shape, binsize, 
     verticals = np.transpose(horizontals, (1, 0, 2))
     
     plt.figure(figsize=figsize)
-    plt.title(f'Image mesh of flower ($C_1$={A}, $C_2$={B}), binsize=${binsize}^2$, mesh=${binsize//every}^2$, beta={beta}, {method}',
+    plt.title(f'Image mesh of {shape} {"($C_1$={A}, $C_2$={B})" if shape == "flower" else ""}, binsize=${binsize}^2$, mesh=${binsize//every}^2$, beta={beta}, {method}',
              fontsize=14)
     
     for i in range(0, binsize, every):
@@ -78,7 +79,7 @@ def plot_mesh(points, distribution, save_path, every=1, method, shape, binsize, 
         plt.plot(verticals[i][m2][::every,0], verticals[i][m2][::every, 1], 
                  'o-', c='k', linewidth=linewidth, markersize=markersize)
     
-    lim_min, lim_max = kwargs.get('limits', (points.min(-2), points.max(-2)))
+    lim_min, lim_max = limits if limits is not None else (points.min(-2), points.max(-2))
     plt.xlabel('$x_1$', fontsize=14)
     plt.xticks(fontsize=14)
     plt.xlim(lim_min[0] - 0.05, lim_max[0] + 0.05)
@@ -86,11 +87,13 @@ def plot_mesh(points, distribution, save_path, every=1, method, shape, binsize, 
     plt.yticks(fontsize=14)
     plt.ylim(lim_min[1] - 0.05, lim_max[1] + 0.05)
     
+    # plt.savefig(os.path.join(path, 'current_result.png'))
     plt.savefig(os.path.join(path, f'mesh_{method}_{shape}_{binsize}_{beta}.pdf'))
     plt.show()
 
 
-def plot_3d_mesh(points, distribution, shape, binsize, save_path, every=1, animate=False):
+def plot_3d_mesh(points, distribution, shape, binsize, path, limits, every=1, animate=False):
+    lim_min, lim_max = limits if limits is not None else ((-1, -1, -1), (1, 1, 1))
     plt.figure(figsize=(10,10))
     ax = plt.axes(projection='3d')
 
@@ -127,9 +130,9 @@ def plot_3d_mesh(points, distribution, shape, binsize, save_path, every=1, anima
                       xbins[i][j][:, 2], 
                       linewidth=w, c='k')
             w = 0.5
-    ax.set_xlim(-1, 1)
-    ax.set_ylim(-1, 1)
-    ax.set_zlim(-1, 1)
+    ax.set_xlim(lim_min[0] - 0.05, lim_max[0] + 0.05)
+    ax.set_ylim(lim_min[1] - 0.05, lim_max[1] + 0.05)
+    ax.set_zlim(lim_min[2] - 0.05, lim_max[2] + 0.05)
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_zticklabels([])
@@ -139,5 +142,6 @@ def plot_3d_mesh(points, distribution, shape, binsize, save_path, every=1, anima
             ax.view_init(elev=30., azim=ii)
             plt.savefig(os.path.join(path, f'animations/{shape}/movie{ii}.png'))
     else:
+        # plt.savefig(os.path.join(path, 'current_result.png'))
         plt.savefig(os.path.join(path, f'mesh_{shape}_{binsize}_{beta}.pdf'))
     plt.show()

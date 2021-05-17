@@ -18,7 +18,8 @@ argparser.add_argument('binsize', type=int, help='number of bins in each dimensi
 argparser.add_argument('shape', choices=['ball', 'disk', 'flower'], help='task to solve')
 argparser.add_argument('method', default='toeplitz', choices=['sinkhorn', 'toeplitz'], help='method to use (default toeplitz)')
 argparser.add_argument('--num_iter', default=100, type=int, required=False, help='maximum number of iterations (default 100)')
-argparser.add_argument('--path', default='.', type=str, required=False, help='path to save obtained matrices (default ".")')
+argparser.add_argument('--path', default='.', type=str, required=False, help='dir to save obtained matrices (default ".")')
+argparser.add_argument('-i', '--interactive', action='count', required=False, help='whether to plot error interactively on each iteration or not (default not interactive)')
 args = argparser.parse_args()
 
 try:
@@ -31,10 +32,10 @@ except:
 
 if args.method == 'toeplitz':
     K, a, b, _, _, _ = sinkhorn_toeplitz(p, q, bin_size=bins, beta=args.beta, max_iter=args.num_iter, 
-                                                  eps=1e-20, tol=1e-20, plot=1)
+                                                  eps=1e-18, tol=1e-18, plot=args.interactive + 1)
 elif args.method == 'sinkhorn':
     X, Y = bins[p.ravel() > 0], bins[q.ravel() > 0]
-    K, a, b = sinkhorn(X, Y, beta=args.beta, max_iter=args.num_iter, eps=1e-20, tol=1e-20)
+    K, a, b = sinkhorn(X, Y, beta=args.beta, max_iter=args.num_iter, eps=1e-18, tol=1e-18)
 
 np.save(os.path.join(args.path, f'K_{args.method}.npy'), K)
 np.save(os.path.join(args.path, f'a_{args.method}.npy'), a)
