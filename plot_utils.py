@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-def plot_image(target, image, path, method, shape, binsize, beta, limits, **kwargs):
+def plot_image(target, image, path, method, shape, binsize, beta, limits, every=1, **kwargs):
     
     s = kwargs.get('s', 2)
     alpha = kwargs.get('alpha', 0.5)
@@ -13,8 +13,8 @@ def plot_image(target, image, path, method, shape, binsize, beta, limits, **kwar
     plt.figure(figsize = figsize)
     plt.title(f'Image of source shape and target, binsize={binsize}$^2$, beta={beta}, {method}',
                  fontsize=18)
-    plt.scatter(target[:,0], target[:,1], s=s, alpha=alpha, c='orange', label='tagret')
-    plt.scatter(image[:,0], image[:,1], s=s, alpha=alpha, c='green', label='source corresponding image')
+    plt.scatter(target[::every,0], target[::every,1], s=s, alpha=alpha, c='orange', label='tagret')
+    plt.scatter(image[::every,0], image[::every,1], s=s, alpha=alpha, c='green', label='source corresponding image')
     
     lim_min, lim_max = limits if limits is not None else (target.min(-2), target.max(-2))
     plt.legend(fontsize=14, loc='upper right', bbox_to_anchor=(1., 0.98))
