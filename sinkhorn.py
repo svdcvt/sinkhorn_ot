@@ -12,7 +12,9 @@ argparser = argparse.ArgumentParser(description=
                                     2) p_{shape}_{binsize}.npy
                                     3) q_{shape}_{binsize}.npy.
                                     
-                                    These files can be precomputed with mesh_task.py.''')
+                                    These files can be precomputed with mesh_task.py.
+                                    
+                                    Since files can be large, arrays are saved with names defined only by method (defualt toeplitz).''')
 argparser.add_argument('beta', type=float, help='regularization parameter')
 argparser.add_argument('binsize', type=int, help='number of bins in each dimension')
 argparser.add_argument('shape', choices=['ball', 'disk', 'flower'], help='task to solve')
