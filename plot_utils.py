@@ -3,6 +3,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+def plot_target(target_dist, side):
+    if target_dist.ndim == 2:
+        plt.figure(figsize=(10, 10))
+        plt.title(f'Source and target shapes.')
+        plt.imshow(target_dist, extent=[-side, side, -side, side], cmap='Greys')
+        plt.savefig('shape.png')
+        plt.close()
+    elif target_dist.ndim == 3:
+        binsize = target_dist.shape[0]
+        k = 8 if binsize <= 128 else 16
+        plt.figure(figsize=(k, binsize // k), tight_layout=True)
+        plt.suptitle(f'Target shapes through Z-axis.')
+        for i in range(binsize):
+            plt.subplot(binsize // k, k, i + 1)
+            plt.title(f'z={i+1}', fontsize=9)
+            plt.imshow(target_dist[:, :, i], extent=[-side, side, -side, side], cmap='Greys')
+            if i < (binsize - k):
+                plt.xticks([])
+            else:
+                plt.xlabel('x')
+            if i % k:
+                plt.yticks([])
+            else:
+                plt.ylabel('y')
+        plt.savefig('shape.png')
+        plt.close()
 
 def plot_image(target, image, path, method, shape, binsize, beta, limits, every=1, **kwargs):
     

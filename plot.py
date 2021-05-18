@@ -22,6 +22,8 @@ argparser.add_argument('-l', '--limits', nargs="*", required=False, help='limits
 argparser.add_argument('-i', '--inverse', action='count', required=False, help='whether to plot mapping from target to source with the same plan (default not inverse)')
 argparser.add_argument('--path', default='../images/', type=str, required=False, help='dir to save images (default "./images/")')
 args = argparser.parse_args()
+
+os.makedirs(args.path, exist_ok=True)
 if args.limits is not None:
     if len(args.limits) in [4, 6]:
         args.limits = tuple((float(args.limits[i]), float(args.limits[i+1])) for i in range(0, len(args.limits), 2))

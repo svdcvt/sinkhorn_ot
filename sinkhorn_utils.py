@@ -344,16 +344,16 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
     if store_full:
         K_full = np.exp(-cdist(bins, bins) / beta)
     if plot:
-        if plot == 1 or store_full:
-            plt.figure(figsize=(10,4))
-        if store_err and plot == 1:
-            plt.subplot(1,2,1)
+        plt.figure(figsize=(10,4))
+        if store_err:
+            if store_full:
+                plt.subplot(1,2,1)
             plt.title('error')
             plt.semilogy(range(len(err)-1), err[1:])
         if store_full:
-            if plot: plt.subplot(1,2,3-plot)
+            if store_err:
+                plt.subplot(1,2,2)
             plt.title('optimal transport matrix')
-            K_full = np.exp(-cdist(bins, bins) / beta)
             plt.imshow(a.reshape(-1,1) * K_full * b.reshape(1,-1))
         plt.savefig('error.png')
         plt.close()
