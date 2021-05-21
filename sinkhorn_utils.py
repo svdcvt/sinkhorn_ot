@@ -9,7 +9,7 @@ from time import time
 
 
 def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True, 
-             eps=1e-12, tol=1e-10, patience=10, verbose=True, plot_err=False, plot_mat=False):
+             eps=1e-12, tol=1e-10, patience=10, verbose=True, plot_err=False, plot_mat=False, testtime=False):
     '''
     X, Y - datapoint of two distributions
     beta - regularization parameter 
@@ -31,6 +31,8 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
     j = 0
     err = [10]
     t = []
+    print('Starting iterative process')
+    
     for i in range(max_iter):
         with np.errstate(divide='ignore', invalid='ignore'):
             s = time()
@@ -49,7 +51,7 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
             if plot_err == 2:
                     IPython.display.clear_output(wait=True)
                     plt.figure(figsize=(10,4))
-                    plt.title(f'error rate, {np.mean(t)*1000:3.3f}ms per iteration')
+                    plt.title(f'error rate, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration, step {np.abs(err[-2] - err[-1]):.3e}')
                     plt.semilogy(range(len(err)-1), err[1:])
                     plt.show()
             
@@ -57,22 +59,20 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
                 # if good enough
                 if err[-1] < eps:
                     if verbose:
-                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
+                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
                     break
                 # if no improvements
                 if np.abs(err[-2] - err[-1]) < tol:
                     j += 1
                     if j > patience:
                         if verbose:
-                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
+                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
                         break
                 else:
                     j = 0
     else:
         if verbose:
-            print(f'#iterations={i+1},  err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
-    print('Finished')
-
+            print(f'#iterations={i+1},  err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
     if store_err and plot_err == 1:
         plt.figure(figsize=(10,4))
         plt.subplot(121)
@@ -89,7 +89,10 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
     np.save(f'K_{method}.npy', K)
     np.save(f'a_{method}.npy', a)
     np.save(f'b_{method}.npy', b)
-    return K, a, b
+    if testtime:
+        return K, a, b, t
+    else:
+        return K, a, b
 
 centers = lambda edges: (edges[:,:-1] + edges[:,1:]) / 2
 
@@ -181,7 +184,8 @@ class Toeplitz(object):
 def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
                       warm_start=None,
                       early_stopping=True, eps=1e-12, tol=1e-10, patience=10, 
-                      verbose=True, store_full=False, store_err=True, plot=0, debug=False, debug_=False):
+                      verbose=True, store_err=True, plot=0, 
+                      debug=False, debug_=False, testtime=False):
     '''
     Arguments
     
@@ -194,6 +198,10 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
         ndarray: array of size [N, D] with coordinates of bin centers
     beta:
         float: entropy regularization parameter 
+    max_iter:
+        int: maximal number of iterations
+    warm_start:
+        (ndarray, ndarray): a, b to start with
     early_stopping:
         bool: whether to stop iterations if the error $E(\gamma)$ value 
               matches the conditions (eps, tol, patience):
@@ -201,16 +209,14 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
     eps:
         float: stops iterations if $E(\gamma)$ < eps
     tol:
-        float: stops iterations if $E(\gamma)_i - $E(\gamma)_{i-1}$ < tol
+        float: stops after |patience| iterations with $E(\gamma)_i - $E(\gamma)_{i-1}$ < tol
     patience:
-        int: 
+        int: number of iterations that can be computed with tol progress until early stopping
     verbose:
         0, 1, 2 (or bool): controls the verbosity:
             0 (False): nothing to be printed
             1 (True): print stopping criteria or/and final error
             2: print every iteration error
-    store_full:
-        bool: whether to calculate and return full matrix K = exp(-C/beta)
     store_err:
         bool: whether to calculate $E(\gamma)$ (if False, then early_stopping is ignored)
     plot:
@@ -221,7 +227,7 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
     
     Return
     K: 
-        Toeplitz or ndarray
+        Toeplitz
     a, b, bins, p, q:
         ndarrays
     
@@ -296,7 +302,6 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
                     print(f'#iterations={i+1},  err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
                 break
         
-
         if store_err:
             with np.errstate(divide='raise', over='raise', under='raise'):
                 try:
@@ -311,7 +316,7 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
             if plot == 2:
                     IPython.display.clear_output(wait=True)
                     plt.figure(figsize=(10,4))
-                    plt.title(f'error rate, {np.mean(t)*1000:3.3f}ms per iteration')
+                    plt.title(f'error rate, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration, step {np.abs(err[-2] - err[-1]):.3e}')
                     plt.semilogy(range(len(err)-1), err[1:])
                     plt.savefig('error.png')
                     plt.close()
@@ -320,48 +325,36 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
                 # if good enough
                 if err[-1] < eps:
                     if verbose:
-                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
+                        print(f'#iterations={i+1}, early stopping: eps, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
                     break
                 # if no improvements
                 if np.abs(err[-2] - err[-1]) < tol:
                     j += 1
                     if j > patience:
                         if verbose:
-                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
+                            print(f'#iterations={i+1}, early stopping: tol, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
                         break
                 else:
                     j = 0
                 # if error goes up
                 if err[-1] > err[-2]:
                     if verbose:
-                        print(f'#iterations={i+1}, early stopping: error up, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
+                        print(f'#iterations={i+1}, early stopping: error up, err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
                     break
-                
     else:
         if verbose:
-            print(f'#iterations={i+1},  err={err[-1]:.5e}, {np.mean(t)*1000:3.3f}ms per iteration')
-    print('Finished')
-    if store_full:
-        K_full = np.exp(-cdist(bins, bins) / beta)
-    if plot:
+            print(f'#iterations={i+1},  err={err[-1]:.5e}, {np.mean(t)*1000:3.3f} (±{np.std(t)*1000:1.1e}) ms per iteration')
+    if plot and store_err:
         plt.figure(figsize=(10,4))
-        if store_err:
-            if store_full:
-                plt.subplot(1,2,1)
-            plt.title('error')
-            plt.semilogy(range(len(err)-1), err[1:])
-        if store_full:
-            if store_err:
-                plt.subplot(1,2,2)
-            plt.title('optimal transport matrix')
-            plt.imshow(a.reshape(-1,1) * K_full * b.reshape(1,-1))
+        plt.title(f'error rate, {np.mean(t)*1000:3.3f}ms per iteration')
+        plt.semilogy(range(len(err)-1), err[1:])
         plt.savefig('error.png')
         plt.close()
-    if store_full:
-        return K_full, a, b, bins, p, q
+    method='toeplitz'
+    np.save(f'K_{method}.npy', K)
+    np.save(f'a_{method}.npy', a)
+    np.save(f'b_{method}.npy', b)
+    if testtime:
+        return K, a, b, bins, p, q, testtime
     else:
-        method='toeplitz'
-        np.save(f'K_{method}.npy', K)
-        np.save(f'a_{method}.npy', a)
-        np.save(f'b_{method}.npy', b)
         return K, a, b, bins, p, q

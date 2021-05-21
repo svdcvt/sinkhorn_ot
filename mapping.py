@@ -14,8 +14,8 @@ argparser = argparse.ArgumentParser(description=
                                     6) b_{method}.npy.
                                     
                                     These files can be precomputed with mesh_task.py (1-3) and sinkhorn.py (4-6).''')
-argparser.add_argument('binsize', type=int, help='number of bins in each dimension')
-argparser.add_argument('shape', choices=['ball', 'disk', 'flower'], help='task to solve')
+argparser.add_argument('--binsize', type=int, help='number of bins in each dimension')
+argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], help='task to solve')
 argparser.add_argument('--method', default='toeplitz', choices=['sinkhorn', 'toeplitz'],  required=False, help='method to use (default toeplitz)')
 argparser.add_argument('--inverse', action='count', required=False, help='whether to find mapping from target to source with the same plan')
 argparser.add_argument('--path', default='.', type=str, required=False, help='dir to save obtained mapping (default ".")')
