@@ -19,40 +19,51 @@ argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], help='task
 argparser.add_argument('--method', default='toeplitz', choices=['sinkhorn', 'toeplitz'],  required=False, help='method to use (default toeplitz)')
 argparser.add_argument('--inverse', action='count', required=False, help='whether to find mapping from target to source with the same plan')
 argparser.add_argument('--path', default='.', type=str, required=False, help='dir to save obtained mapping (default ".")')
+argparser.add_argument('--testtime', default=1, type=int, required=False, help='number of times to run mapping to get time benchmarks (needed only for me)')
 args = argparser.parse_args()
 
 # ------------------------------------
 
 binsize, shape, method, inverse, path = args.binsize, args.shape, args.method, args.inverse, args.path
+if args.testtime > 1: 
+    T = np.zeros(args.testtime)
 
 try:
     bins = np.load(f'bins_{shape}_{binsize}.npy', allow_pickle=True)
     p    = np.load(f'p_{shape}_{binsize}.npy', allow_pickle=True)
     q    = np.load(f'q_{shape}_{binsize}.npy', allow_pickle=True)
 
-    K = np.load(f'K_{method}.npy', allow_pickle=True).item(0)
+    K = np.load(f'K_{method}.npy', allow_pickle=True)
+    if method == 'toeplitz': K = K.item(0)
     a = np.load(f'a_{method}.npy', allow_pickle=True)[:, None]
     b = np.load(f'b_{method}.npy', allow_pickle=True)[:, None]
 except:
     print('Files with arrays for algorithm are not found (bins, p, q; K, a, b),'\
           'please, run script from the directory with these files.')
     exit()
-
-start = time()
-if method == 'toeplitz':
-    if not inverse:
-        bt = b * bins
-        mapped = (np.vstack([K.matvec(bt[:,i], 0) for i in range(bins.shape[1])]) * a.T).T / (p.ravel() + 1e-20)[:,None]
+for i in range(args.testtime):
+    start = time()
+    if method == 'toeplitz':
+        if not inverse:
+            bt = b * bins
+            mapped = (np.vstack([K.matvec(bt[:,i], 0) for i in range(bins.shape[1])]) * a.T).T / (p.ravel() + 1e-20)[:,None]
+        else:
+            at = a * bins
+            mapped = (np.vstack([K.matvec(at[:,i], 0) for i in range(bins.shape[1])]) * b.T).T / (q.ravel() + 1e-20)[:,None]
     else:
-        at = a * bins
-        mapped = (np.vstack([K.matvec(at[:,i], 0) for i in range(bins.shape[1])]) * b.T).T / (q.ravel() + 1e-20)[:,None]
-else:
-    if not inverse:
-        mapped = ((K   @ (b * bins[q.ravel()>0])).T * a.T).T / (p.ravel() + 1e-20)[p.ravel() > 0,None]
-    else:
-        mapped = ((K.T @ (a * bins[p.ravel()>0])).T * b.T).T / (q.ravel() + 1e-20)[q.ravel() > 0,None]
-t = time() - start
-
+        if not inverse:
+            mapped = ((K   @ (b * bins[q.ravel() > 0])).T * a.T).T / (p.ravel() + 1e-20)[p.ravel() > 0,None]
+        else:
+            mapped = ((K.T @ (a * bins[p.ravel() > 0])).T * b.T).T / (q.ravel() + 1e-20)[q.ravel() > 0,None]
+    t = time() - start
+    if i < 5:
+        print(f'Done in {t*1000:.3f} ms.')
+    if i >= 5:
+        print('|', end='', flush=True)
+    if args.testtime > 1: 
+        T[i] = t
+if args.testtime > 1:
+    print(f'\nAverage time is {T[1:].mean()*1000:.3f} (± {T[1:].std()*1000:.3f}) ms.')
 name = os.path.join(path, f'{"source_image" if not inverse else "target_preimage"}_{method}_{shape}_{binsize}.npy')
 np.save(name, mapped)
-print(f'Done in {t*1000:.3f} ms.\nFile saved as {name}.')
+print(f'File saved as {name}.')

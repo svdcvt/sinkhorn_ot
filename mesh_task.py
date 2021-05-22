@@ -12,12 +12,13 @@ argparser = argparse.ArgumentParser(description=
                                     defined on interval [-side, side]^{2|3} with number of bins defined by binsize parameter.
                                      
                                     Since files can be large, arrays are saved with names defined only by shape and binsize.''')
-argparser.add_argument('binsize', type=int, help='number of bins in each dimension')
-argparser.add_argument('shape', choices=['ball', 'disk', 'flower'], help='task to solve')
+argparser.add_argument('--binsize', type=int, help='number of bins in each dimension')
+argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], help='task to solve')
 argparser.add_argument('-ABT', default=[0.7, 0.3, 3], nargs=3, type=float, required=False, help='flower parameters: A + B * cos(T*theta) (default 0.7 0.3 3)')
-argparser.add_argument('-r', '--radius', default=1., type=float, required=False, help='ball/disk radius (default 1.')
-argparser.add_argument('-s', '--side', default=1., type=float, required=False, help='square/cube size: [-s, s]^{2|3} (default 1.')
-argparser.add_argument('--path', default='./arrays', type=str, required=False, help='dir path to save (default ./arrays')
+argparser.add_argument('-r', '--radius', default=1., type=float, required=False, help='ball/disk radius (default 1.)')
+argparser.add_argument('-s', '--side', default=1., type=float, required=False, help='square/cube size: [-s, s]^{2|3} (default 1.)')
+argparser.add_argument('-o', '--outer', default=0, action='count', required=False, help='whether to use outer of target shape (крыло)')
+argparser.add_argument('--path', default='./arrays', type=str, required=False, help='dir path to save (default ./arrays)')
 args = argparser.parse_args()
 
 os.makedirs(args.path, exist_ok=True)
@@ -51,7 +52,7 @@ if shape in ['disk', 'flower']:
     p = p.reshape(binsize, binsize)
     # q
     q = np.zeros_like(q).ravel()
-    q[is_shape] = 1 / is_shape.sum()
+    q[is_shape if not args.outer else ~is_shape] = 1 / is_shape.sum()
     q = q.reshape(binsize, binsize)
 
     end = time() - start
@@ -77,7 +78,7 @@ elif shape in ['ball', 'tor']:
     p = p.reshape(binsize, binsize, binsize)
     # q
     q = np.zeros_like(q).ravel()
-    q[is_shape] = 1 / is_shape.sum()
+    q[is_shape if not args.outer else ~is_shape] = 1 / is_shape.sum()
     q = q.reshape(binsize, binsize, binsize)
 
     end = time() - start

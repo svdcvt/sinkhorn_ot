@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 from scipy.spatial.distance import cdist
+from scipy.linalg import toeplitz
 from tqdm import tqdm
 import IPython.display
 from time import time
@@ -178,8 +179,19 @@ class Toeplitz(object):
     
     def full(self):
         ''' return full matrix np.exp(-C / beta) without recomputation'''
-        raise NotImplementedError()
-
+        if self.dim == 1:
+            return toeplitz(self.top)
+        if self.dim == 2:
+            blocks = np.array([toeplitz(c) for c in self.top])
+        elif self.dim == 3:
+            Bblocks = [[toeplitz(c) for c in top2level] for top2level in self.top]
+            blocks = np.array([np.block([[*blocks]] + [[*blocks[slice(i, 0, -1)], *blocks[slice(0,-i)]] \
+                                    for i in range(1, len(blocks))]) for blocks in Bblocks])
+        finally:
+            return np.block([[*blocks]] + [[*blocks[slice(i, 0, -1)], *blocks[slice(0,-i)]] for i in range(1, len(blocks))])
+    
+    def distance_matrix(self, beta):
+        return - beta * np.log(self.full())
 
 def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
                       warm_start=None,

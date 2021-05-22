@@ -13,10 +13,10 @@ argparser = argparse.ArgumentParser(description=
                                     4) q_{shape}_{binsize}.npy.
                                     
                                     These files can be precomputed with mapping.py (1) and mesh_task.py (2-4).''')
-argparser.add_argument('--beta', type=float, help='used regularization parameter (for titles)')
-argparser.add_argument('--binsize', type=int, help='used number of bins')
-argparser.add_argument('--meshsize', type=int, help='number of bins to plot')
-argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], help='solved task')
+argparser.add_argument('--beta', type=float, required=True, help='used regularization parameter (for titles)')
+argparser.add_argument('--binsize', type=int, required=True, help='used number of bins')
+argparser.add_argument('--meshsize', type=int, required=True, help='number of bins to plot')
+argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], required=True, help='solved task')
 argparser.add_argument('--method', default='toeplitz', choices=['sinkhorn', 'toeplitz'], required=False, help='used method (default toeplitz)')
 argparser.add_argument('-l', '--limits', nargs="*", required=False, help='limits for plots, pass 4 or 6 arguments for min_x, min_y, [min_z], max_x, max_y, [max_z] (default target min/max)')
 argparser.add_argument('-i', '--inverse', action='count', required=False, help='whether to plot mapping from target to source with the same plan (default not inverse)')
