@@ -3,12 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-def plot_target(target_dist, side):
+def plot_target(target_dist, side, name):
     if target_dist.ndim == 2:
         plt.figure(figsize=(10, 10))
         plt.title(f'Source and target shapes.')
         plt.imshow(target_dist, extent=[-side, side, -side, side], cmap='Greys')
-        plt.savefig('shape.png')
+        plt.savefig(f'{name}.pdf')
         plt.close()
     elif target_dist.ndim == 3:
         binsize = target_dist.shape[0]
@@ -27,7 +27,7 @@ def plot_target(target_dist, side):
                 plt.yticks([])
             else:
                 plt.ylabel('y')
-        plt.savefig('shape.png')
+        plt.savefig(f'{name}.pdf')
         plt.close()
 
 def plot_image(target, image, path, method, shape, binsize, beta, limits, every=1, **kwargs):
@@ -114,25 +114,25 @@ def plot_mesh(points, distribution, path, method, shape, binsize, beta, limits, 
     plt.ylim(lim_min[1] - 0.05, lim_max[1] + 0.05)
     
     # plt.savefig(os.path.join(path, 'current_result.png'))
-    plt.savefig(os.path.join(path, f'mesh_{method}_{shape}_{binsize}_{beta}.pdf'))
+    plt.savefig(os.path.join(path, f'mesh_{method}_{shape}_{binsize}_{beta}.pdf') , bbox_inches='tight')
     plt.show()
 
 
-def plot_3d_mesh(points, distribution, shape, binsize, path, limits, every=1, animate=False):
+def plot_3d_mesh(points, distribution, shape, binsize, beta, path, limits, every=1, animate=False):
     lim_min, lim_max = limits if limits is not None else ((-1, -1, -1), (1, 1, 1))
     plt.figure(figsize=(10,10))
     ax = plt.axes(projection='3d')
 
     distribution = distribution.reshape(binsize, binsize, binsize)
-    bins = bins.reshape(binsize, binsize, binsize, 3)
+    bins = points.reshape(binsize, binsize, binsize, 3)
 
     zbins = np.transpose(bins, (0, 1, 2, 3)) # fix (x, y), connect z
     ybins = np.transpose(bins, (0, 2, 1, 3)) # fix (x, z), connect y
     xbins = np.transpose(bins, (2, 1, 0, 3)) # fix (z, y), connect x
 
-    xp = np.transpose(p, (0, 1, 2))
-    yp = np.transpose(p, (0, 2, 1))
-    zp = np.transpose(p, (2, 1, 0))
+    xp = np.transpose(distribution, (0, 1, 2))
+    yp = np.transpose(distribution, (0, 2, 1))
+    zp = np.transpose(distribution, (2, 1, 0))
     
     w = 0.5
     for i in tqdm(list(range(0, binsize, every)) + [binsize-1]):
@@ -169,5 +169,7 @@ def plot_3d_mesh(points, distribution, shape, binsize, path, limits, every=1, an
             plt.savefig(os.path.join(path, f'animations/{shape}/movie{ii}.png'))
     else:
         # plt.savefig(os.path.join(path, 'current_result.png'))
-        plt.savefig(os.path.join(path, f'mesh_{shape}_{binsize}_{beta}.pdf'))
+        for ii in range(0, 180, 60):
+            ax.view_init(elev=30., azim=ii)
+            plt.savefig(os.path.join(path, f'mesh_{ii}_{shape}_{binsize}_{beta}.pdf'))
     plt.show()

@@ -3,6 +3,7 @@ from time import time
 import argparse
 import numpy as np
 
+from scipy.spatial import Delaunay
 from sinkhorn_utils import binning
 from plot_utils import plot_target
 
@@ -13,7 +14,7 @@ argparser = argparse.ArgumentParser(description=
                                      
                                     Since files can be large, arrays are saved with names defined only by shape and binsize.''')
 argparser.add_argument('--binsize', type=int, help='number of bins in each dimension')
-argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], help='task to solve')
+argparser.add_argument('--shape', choices=['ball', 'disk', 'polygon', 'flower', 'cylinder'], help='task to solve')
 argparser.add_argument('-ABT', default=[0.7, 0.3, 3], nargs=3, type=float, required=False, help='flower parameters: A + B * cos(T*theta) (default 0.7 0.3 3)')
 argparser.add_argument('-r', '--radius', default=1., type=float, required=False, help='ball/disk radius (default 1.)')
 argparser.add_argument('-s', '--side', default=1., type=float, required=False, help='square/cube size: [-s, s]^{2|3} (default 1.)')
@@ -32,7 +33,7 @@ while args.radius > args.side and shape in ['disk', 'ball']:
     print('For disk (target) shape it is recommended to use radius less or equal than square (target) half-side.')
     args.radius, args.side = map(float, input('Input another values for R (radius) and S (half-side):').split())
 
-if shape in ['disk', 'flower']:
+if shape in ['disk', 'flower', 'polygon']:
     # 2D shape
     start = time()
     borders = np.array(np.meshgrid([-args.side, args.side],
@@ -42,9 +43,15 @@ if shape in ['disk', 'flower']:
 
     if shape == 'disk': 
         is_shape = x ** 2 + y ** 2  <= args.radius ** 2
+        name = f'{shape}_{args.radius}'
     elif shape == 'flower':
         is_shape = (A + B * np.cos(t * np.arctan2(y, x))) >= np.sqrt(x ** 2 + y ** 2)
-    
+        name = f'{shape}_{A}_{B}_{int(t)}'
+    elif shape == 'polygon':
+        vert_points = (-0.75, -0.55), (-0.75, 0.65), (0.25, 0.75), (0.75, 0.55), (0.55, -0.75)
+        hull = Delaunay(vert_points)
+        is_shape = hull.find_simplex(bins) >= 0  
+        name = f'{shape}'  
     # p
     p = np.zeros_like(p).ravel()
     is_reg = (np.abs(x) <= args.side) * (np.abs(y) <= args.side)
@@ -57,7 +64,7 @@ if shape in ['disk', 'flower']:
 
     end = time() - start
 
-elif shape in ['ball', 'tor']:
+elif shape in ['ball', 'tor', 'cylinder']:
     # 3D shape
     start = time()
     borders = np.array(np.meshgrid([-args.side, args.side],
@@ -68,9 +75,15 @@ elif shape in ['ball', 'tor']:
 
     if shape == 'ball':
         is_shape = x**2 + y**2 + z**2 <= args.radius**2
+        name = f'{shape}_{args.radius}'
     elif shape == 'tor': # not a choice right now, since it has a hole and can't be meshed properly idky
         R, r = 0.7, 0.3
         is_shape = (x**2 + y**2 + z**2 + R**2 - r**2)**2 - 4 * R**2*(x**2 + y**2) <= 0
+        name = f'{shape}_{R}_{r}'
+    elif shape == 'cylinder':
+        is_shape = x**2 + y**2 <= args.radius**2
+        name = f'{shape}_{args.radius}'
+
     # p
     p = np.zeros_like(p).ravel()
     is_reg = (np.abs(x) <= args.side) * (np.abs(y) <= args.side) * (np.abs(z) <= args.side)
@@ -87,5 +100,6 @@ np.save(os.path.join(args.path, f'bins_{shape}_{binsize}.npy'), bins)
 np.save(os.path.join(args.path, f'p_{shape}_{binsize}.npy'), p)
 np.save(os.path.join(args.path, f'q_{shape}_{binsize}.npy'), q)
 
-plot_target(q, args.side)
+
+plot_target(q, args.side, 'images/shapes/' + name)
 print(f'Done in {end*1000:.5f}ms.\nFiles saved at {args.path}. See target plot at "shape.png"')

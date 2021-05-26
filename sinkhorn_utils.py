@@ -10,7 +10,8 @@ from time import time
 
 
 def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True, 
-             eps=1e-12, tol=1e-10, patience=10, verbose=True, plot_err=False, plot_mat=False, testtime=False):
+             eps=1e-12, tol=1e-10, patience=10, verbose=True, plot_err=False, plot_mat=False,
+             testtime=False, return_err=False):
     '''
     X, Y - datapoint of two distributions
     beta - regularization parameter 
@@ -91,9 +92,15 @@ def sinkhorn(X, Y, beta=0.01, max_iter=200, store_err=True, early_stopping=True,
     np.save(f'a_{method}.npy', a)
     np.save(f'b_{method}.npy', b)
     if testtime:
-        return K, a, b, t
+        if return_err:
+            return K, a, b, t, err
+        else:
+            return K, a, b, t
     else:
-        return K, a, b
+        if return_err:
+            return K, a, b, err
+        else:
+            return K, a, b
 
 centers = lambda edges: (edges[:,:-1] + edges[:,1:]) / 2
 
@@ -178,7 +185,10 @@ class Toeplitz(object):
         return np.real(mkl_fft.ifftn(np.multiply(self.circ_fft, x_fft))[self.area]).ravel()
     
     def full(self):
-        ''' return full matrix np.exp(-C / beta) without recomputation'''
+        ''' 
+        return full matrix np.exp(-C / beta) without recomputation
+        actually just the way to construct BTTB matrix of level 1, 2, 3 (N can be done also)
+        '''
         if self.dim == 1:
             return toeplitz(self.top)
         if self.dim == 2:
@@ -187,17 +197,24 @@ class Toeplitz(object):
             Bblocks = [[toeplitz(c) for c in top2level] for top2level in self.top]
             blocks = np.array([np.block([[*blocks]] + [[*blocks[slice(i, 0, -1)], *blocks[slice(0,-i)]] \
                                     for i in range(1, len(blocks))]) for blocks in Bblocks])
-        finally:
-            return np.block([[*blocks]] + [[*blocks[slice(i, 0, -1)], *blocks[slice(0,-i)]] for i in range(1, len(blocks))])
+        else:
+            raise NotImplementedError()
+        return np.block([[*blocks]] + [[*blocks[slice(i, 0, -1)], *blocks[slice(0,-i)]] for i in range(1, len(blocks))])
     
-    def distance_matrix(self, beta):
-        return - beta * np.log(self.full())
+    def distance_matrix(self, beta, full=None):
+        return - beta * np.log(self.full() if full is None else full)
+    
+    def sinkhorn_distance(self, a, b, beta):
+        ''' пока что полная матрица используется '''
+        K = self.full
+        return np.sum(a * K * b.reshape(1, -1) * self.distance_matrix(beta, K))
+
 
 def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
                       warm_start=None,
                       early_stopping=True, eps=1e-12, tol=1e-10, patience=10, 
                       verbose=True, store_err=True, plot=0, 
-                      debug=False, debug_=False, testtime=False):
+                      debug=False, debug_=False, testtime=False, return_err=False):
     '''
     Arguments
     
@@ -241,7 +258,7 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
     K: 
         Toeplitz
     a, b, bins, p, q:
-        ndarrays
+        ndarrays, (B, 1), (B, 1), (B, d), (B, 1), (B, 1), where B is overall number of bins
     
     '''
     if isinstance(bin_size, int):
@@ -367,6 +384,9 @@ def sinkhorn_toeplitz(X, Y, bin_size, beta=0.01, max_iter=200,
     np.save(f'a_{method}.npy', a)
     np.save(f'b_{method}.npy', b)
     if testtime:
-        return K, a, b, bins, p, q, testtime
+        if return_err:
+            return K, a, b, bins, p, q, testtime, err
     else:
+        if return_err:
+            return K, a, b, bins, p, q, err
         return K, a, b, bins, p, q

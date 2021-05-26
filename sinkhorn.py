@@ -17,7 +17,7 @@ argparser = argparse.ArgumentParser(description=
                                     Since files can be large, arrays are saved with names defined only by method (defualt toeplitz).''')
 argparser.add_argument('--beta', type=float, help='regularization parameter')
 argparser.add_argument('--binsize', type=int, help='number of bins in each dimension')
-argparser.add_argument('--shape', choices=['ball', 'disk', 'flower'], help='task to solve')
+argparser.add_argument('--shape', choices=['ball', 'disk', 'polygon', 'flower', 'cylinder'], help='task to solve')
 argparser.add_argument('--method', default='toeplitz', choices=['sinkhorn', 'toeplitz'], required=False, help='method to use (default toeplitz)')
 argparser.add_argument('-e','--eps', default=1e-18, type=float, required=False, help='tolerance value when to stop iterations if error < eps (default 1e-18)')
 argparser.add_argument('-N','--num_iter', default=100, type=int, required=False, help='maximum number of iterations (default 100)')
